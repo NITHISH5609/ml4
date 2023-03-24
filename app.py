@@ -1,38 +1,39 @@
-from flask import Flask,render_template,redirect,url_for
+import os
+from PIL import Image
+import keras
+from keras.preprocessing.text import tokenizer_from_json
+import captioning
+import json
+import streamlit as st
+import translate
 
-app = Flask(__name__)
+st.title("Dekh.ai")
+st.header("Image Captioning Translator")
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+with open('models/tokenizer.json', 'r') as f:
+    tokenizer_json = json.load(f)
+tokenizer = tokenizer_from_json(tokenizer_json)
+    
+model = keras.models.load_model("models/image_captioning.h5")
+vocab_size = tokenizer.num_words
+max_length = 37
 
-@app.route("/default")
-def default():
-    return render_template("layout.html")
-
-@app.route("/variable")
-def var():
-    user = "Geeksforgeeks"
-    return render_template("variable_example.html",name=user)
-
-@app.route("/if")
-def ifelse():
-    user = "Practice GeeksforGeeks"
-    return render_template("if_example.html",name=user)
-
-@app.route("/for")
-def for_loop():
-    list_of_courses = ['Java','Python','C++','MATLAB']
-    return render_template("for_example.html",courses=list_of_courses)
-
-@app.route("/choice/<pick>")
-def choice(pick):  
-    if pick == 'variable':  
-        return redirect(url_for('var'))  
-    if pick == 'if':  
-        return redirect(url_for('ifelse'))  
-    if pick == 'for':  
-        return redirect(url_for('for_loop'))  
-
-if __name__ == "__main__":
-    app.run(debug=False)
+uploaded_file = st.file_uploader(label="Upload an Image")
+if uploaded_file:
+    img = Image.open(uploaded_file)
+    
+    new_folder = os.path.join(os.getcwd(), 'uploaded_images')
+    if not os.path.exists(new_folder):
+        os.makedirs(new_folder)
+    
+    image_path = os.path.join(new_folder, uploaded_file.name)
+    img.save(image_path)
+    
+    features = captioning.image_features("uploaded_images")
+    imgname,_ = uploaded_file.name.split('.')
+    caption = captioning.give_caption(model, tokenizer, max_length, features[imgname])
+    
+    st.image(f"uploaded_images/{uploaded_file.name}")
+    st.write(caption)
+    choice = st.radio("Select Target Text",("hi","kn","ta"))
+    st.write(translate.caption_translate("en",choice,caption))
